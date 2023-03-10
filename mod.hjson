@@ -1,0 +1,11 @@
+{
+  displayName: "Agzam's Units Mod"
+  name: "agzam4mod-units"
+  author: "Agzam4"
+  main: "agzam4.UnitsMod"
+  description: "Hide units hotkey & button"
+  version: 1.0
+  minGameVersion: 136
+  java: true
+  hidden: true
+}
