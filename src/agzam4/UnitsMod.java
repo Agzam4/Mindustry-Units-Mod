@@ -1,15 +1,19 @@
 package agzam4;
 
 import arc.Core;
+import arc.Events;
 import arc.KeyBinds.Axis;
 import arc.KeyBinds.KeyBind;
 import arc.KeyBinds.Section;
 import arc.func.Boolc;
 import arc.func.Cons;
 import arc.graphics.Color;
+import arc.graphics.g2d.Draw;
+import arc.graphics.g2d.Fill;
 import arc.graphics.g2d.TextureRegion;
 import arc.input.InputDevice.DeviceType;
 import arc.input.KeyCode;
+import arc.math.Mathf;
 import arc.scene.event.InputEvent;
 import arc.scene.event.InputListener;
 import arc.scene.style.TextureRegionDrawable;
@@ -18,11 +22,19 @@ import arc.scene.ui.layout.Table;
 import arc.scene.utils.Selection;
 import arc.util.Strings;
 import arc.util.Time;
+import arc.util.Tmp;
 import mindustry.Vars;
 import mindustry.content.Blocks;
 import mindustry.content.UnitTypes;
+import mindustry.game.EventType.Trigger;
+import mindustry.game.Team;
 import mindustry.gen.Call;
+import mindustry.gen.Groups;
+import mindustry.gen.Unit;
+import mindustry.graphics.Drawf;
+import mindustry.graphics.Layer;
 import mindustry.graphics.Pal;
+import mindustry.graphics.Shaders;
 import mindustry.mod.Mod;
 import mindustry.type.UnitType;
 import mindustry.ui.Styles;
@@ -39,17 +51,18 @@ import java.util.Locale;
 
 public class UnitsMod extends Mod {
 
-	private static boolean hideUnits, comfortMega;
+	private static boolean hideUnits, comfortMega, drawUnitsHitboxes;
 	private static Axis hideUnitsHotkey = new Axis(KeyCode.h);
 
 	private static final String settingCategoryName = Locale.getDefault() == Locale.ENGLISH ? "Units settings" : "Настройки юнитов";
 	private static final String buttonsText[] = Locale.getDefault() == Locale.ENGLISH ? 
-			new String[] {"Hide units body", "Hide units key", "No \"ice moving\" on poly, mega, and"}: 
-			new String[] {"Скрывать корпус юнитов", "Клаиша скрытия юнитов", "Убрать скольжение у меги"};
+			new String[] {"Hide units body", "Hide units key", "No \"ice moving\" on poly, mega, and", "Show hitboxes on hide"}: 
+			new String[] {"Скрывать корпус юнитов", "Клаиша скрытия юнитов", "Убрать скольжение у меги", "Отоброжать хитбоксы когда скрыты"};
 	
 	private UnitTextures[] unitTextures;
 	
 	private TextureRegion none;
+	private TextureRegion minelaser, minelaserEnd;
 
 	private UnitType[] units;
 
@@ -72,11 +85,14 @@ public class UnitsMod extends Mod {
 			}
 			hideUnits = Core.settings.getBool("agzam4mod-units.settings.hideUnits", false);
 			comfortMega = Core.settings.getBool("agzam4mod-units.settings.comfortMega", false);
+			drawUnitsHitboxes = Core.settings.getBool("agzam4mod-units.settings.drawUnitsHitboxes", true);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 		
 		none = new TextureRegion(Core.atlas.find("agzam4mod-units-none"));
+		minelaser = Core.atlas.find("minelaser");
+		minelaserEnd = Core.atlas.find("minelaser-end");
 		
 		units = new UnitType[] {
 				mace, dagger, crawler, fortress, scepter, reign, vela,
@@ -137,7 +153,15 @@ public class UnitsMod extends Mod {
 				@Override
 				public void get(boolean b) {
 					comfortMega(b);
-//					hideUnits(b); TODO
+				}
+			});
+			table.row();
+
+			table.checkPref(buttonsText[3], hideUnits, new Boolc() {
+				
+				@Override
+				public void get(boolean b) {
+					drawUnitsHitboxes(b);
 				}
 			});
 			table.row();
@@ -175,22 +199,55 @@ public class UnitsMod extends Mod {
 		
 		megaAccel = mega.accel;
 		megaDragg = mega.drag;
+		megaSpeed = mega.speed;
 		 
+		Events.run(Trigger.draw, () -> {
+			if(drawUnitsHitboxes && hideUnits) {
+				for (int i = 0; i < Groups.unit.size(); i++) {
+					Unit unit = Groups.unit.index(i);
+					UnitType unitType = unit.type;
+					Team team = unit.team();
+					
+					if(unitType == alpha || unitType == beta || unitType == gamma) {
+						if(team == player.team()) continue;
+					}
+					
+	                Draw.reset();
+	                Draw.z(Layer.buildBeam);
+
+	                Draw.color(team.color, Color.black, .25f);
+	                Fill.square(unit.x, unit.y, unit.hitSize/2f + 1, 45);
+	                
+	                Draw.color(team.color);
+	                Fill.square(unit.x, unit.y, unit.hitSize/2f, 45);
+	                
+	                Draw.reset();
+				}
+			}
+		});
 		super.init();
 	}
 
-	private float megaAccel, megaDragg;
+	protected void drawUnitsHitboxes(boolean b) {
+		drawUnitsHitboxes = b;		
+		Core.settings.put("agzam4mod-units.settings.drawUnitsHitboxes", b);
+		Core.settings.saveValues();
+	}
+
+	private float megaAccel, megaDragg, megaSpeed;
 
 	private void comfortMega(boolean b) {
 		comfortMega = b;
 		Core.settings.put("agzam4mod-units.settings.comfortMega", b);
 		Core.settings.saveValues();
 		if(comfortMega) {
-			mega.accel = evoke.accel;
-			mega.drag = evoke.drag;
+			mega.accel = emanate.accel;
+			mega.drag = emanate.drag;
+//			mega.speed = 3;
 		} else {
 			mega.accel = megaAccel;
 			mega.drag = megaDragg;
+//			mega.speed = megaSpeed;
 		}
 	}
 	
@@ -201,11 +258,18 @@ public class UnitsMod extends Mod {
 		if(b) {
 			for (int i = 0; i < unitTextures.length; i++) {
 				unitTextures[i].hideTextures();
+				unitTextures[i].hideEngines();
 			}
+
+			Core.atlas.addRegion("minelaser", none);
+			Core.atlas.addRegion("minelaser-end", none);
 		} else {
 			for (int i = 0; i < units.length; i++) {
 				unitTextures[i].returnTextures();
+				unitTextures[i].returnEngines();
 			}
+			Core.atlas.addRegion("minelaser", minelaser);
+			Core.atlas.addRegion("minelaser-end", minelaserEnd);
 		}
 	}
 

@@ -11,8 +11,9 @@ public class UnitTextures {
 
     public TextureRegion baseRegion, legRegion, region, previewRegion, shadowRegion, cellRegion, itemCircleRegion,
         softShadowRegion, jointRegion, footRegion, legBaseRegion, baseJointRegion, outlineRegion, treadRegion;
-    
+
     public TextureRegion[][] weaponsTextures;
+    public float[] enginesRadius;
 
     public UnitType unit;
     
@@ -32,7 +33,7 @@ public class UnitTextures {
     	legBaseRegion 		= unit.legBaseRegion;
     	baseJointRegion 	= unit.baseJointRegion;
     	treadRegion 		= unit.treadRegion;
-    	
+
     	weaponsTextures = new TextureRegion[unit.weapons.size][4];
     	
     	for (int i = 0; i < unit.weapons.size; i++) {
@@ -42,7 +43,24 @@ public class UnitTextures {
 			weaponsTextures[i][2] = weapon.cellRegion;
 			weaponsTextures[i][3] = weapon.outlineRegion;
 		}
+    	
+    	enginesRadius = new float[unit.engines.size];
+    	for (int i = 0; i < enginesRadius.length; i++) {
+    		enginesRadius[i] = unit.engines.get(i).radius;
+		}
 	}
+
+    public void hideEngines() {
+    	for (int i = 0; i < unit.engines.size; i++) {
+    		unit.engines.get(i).radius = 0;
+		}
+    }
+    
+    public void returnEngines() {
+    	for (int i = 0; i < unit.engines.size; i++) {
+    		unit.engines.get(i).radius = enginesRadius[i];
+		}
+    }
     
     public void returnTextures() {
         unit.baseRegion      	= baseRegion;
