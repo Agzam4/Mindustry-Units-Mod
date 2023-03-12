@@ -18,7 +18,10 @@ import arc.scene.ui.layout.Table;
 import arc.scene.utils.Selection;
 import arc.util.Strings;
 import arc.util.Time;
+import mindustry.Vars;
+import mindustry.content.Blocks;
 import mindustry.content.UnitTypes;
+import mindustry.gen.Call;
 import mindustry.graphics.Pal;
 import mindustry.mod.Mod;
 import mindustry.type.UnitType;
@@ -26,6 +29,7 @@ import mindustry.ui.Styles;
 import mindustry.ui.dialogs.SettingsMenuDialog;
 import mindustry.ui.dialogs.SettingsMenuDialog.SettingsCategory;
 import mindustry.ui.dialogs.SettingsMenuDialog.SettingsTable;
+import mindustry.world.Block;
 
 import static mindustry.Vars.*;
 import static mindustry.content.UnitTypes.*;
@@ -35,13 +39,13 @@ import java.util.Locale;
 
 public class UnitsMod extends Mod {
 
-	private static boolean hideUnits;
+	private static boolean hideUnits, comfortMega;
 	private static Axis hideUnitsHotkey = new Axis(KeyCode.h);
 
 	private static final String settingCategoryName = Locale.getDefault() == Locale.ENGLISH ? "Units settings" : "Настройки юнитов";
 	private static final String buttonsText[] = Locale.getDefault() == Locale.ENGLISH ? 
-			new String[] {"Hide units body", "Hide units key"}: 
-			new String[] {"Скрывать корпус юнитов", "Клаиша скрытия юнитов"};
+			new String[] {"Hide units body", "Hide units key", "No \"ice moving\" on poly, mega, and"}: 
+			new String[] {"Скрывать корпус юнитов", "Клаиша скрытия юнитов", "Убрать скольжение у меги"};
 	
 	private UnitTextures[] unitTextures;
 	
@@ -66,7 +70,8 @@ public class UnitsMod extends Mod {
 					hideUnitsHotkey = new Axis(KeyCode.h);
 				}
 			}
-			hideUnits = Core.settings.getBool("agzam4mod-units.settings.hideUnits");
+			hideUnits = Core.settings.getBool("agzam4mod-units.settings.hideUnits", false);
+			comfortMega = Core.settings.getBool("agzam4mod-units.settings.comfortMega", false);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -115,20 +120,30 @@ public class UnitsMod extends Mod {
             hotkeyTable.row();
             settingsTable.add(hotkeyTable);
             settingsTable.row();
-            
-			SettingsTable hideTable = new SettingsTable();
-			hideTable.row();
-            hideTable.checkPref(buttonsText[0], hideUnits, new Boolc() {
+
+			SettingsTable table = new SettingsTable();
+			table.row();
+			table.checkPref(buttonsText[0], hideUnits, new Boolc() {
 				
 				@Override
 				public void get(boolean b) {
 					hideUnits(b);
 				}
 			});
-			hideTable.row();
-            settingsTable.add(hideTable);
+			table.row();
+
+			table.checkPref(buttonsText[2], hideUnits, new Boolc() {
+				
+				@Override
+				public void get(boolean b) {
+					comfortMega(b);
+//					hideUnits(b); TODO
+				}
+			});
+			table.row();
+            settingsTable.add(table);
+
             settingsTable.row();
-            
             // Core.bundle.get("keybind." + hideUnitsHotkey.key.name() + ".name"
             
 
@@ -157,8 +172,26 @@ public class UnitsMod extends Mod {
 	                return super.keyDown(event, keyCode);
 	            }
 	        });
+		
+		megaAccel = mega.accel;
+		megaDragg = mega.drag;
 		 
 		super.init();
+	}
+
+	private float megaAccel, megaDragg;
+
+	private void comfortMega(boolean b) {
+		comfortMega = b;
+		Core.settings.put("agzam4mod-units.settings.comfortMega", b);
+		Core.settings.saveValues();
+		if(comfortMega) {
+			mega.accel = evoke.accel;
+			mega.drag = evoke.drag;
+		} else {
+			mega.accel = megaAccel;
+			mega.drag = megaDragg;
+		}
 	}
 	
 	private void hideUnits(boolean b) {
